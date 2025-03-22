@@ -185,18 +185,46 @@ def generar_arbol():
 
 # Función de consulta modificada: se piden solo los valores en orden
 def consultar_arbol():
-    entrada = simpledialog.askstring("Consulta", 
-                                     f"Introduce la consulta (Ej: soleado, caluroso, alta, falso)\nOrden: {', '.join(atributos[:-1])}")
-    if entrada:
+    # Crear una nueva ventana para la consulta
+    ventana_consulta = tk.Toplevel(root)
+    ventana_consulta.title("Consulta del Árbol de Decisión")
+    
+    # Frame para los desplegables
+    consulta_frame = tk.Frame(ventana_consulta)
+    consulta_frame.pack(pady=20)
+
+    # Diccionario para los valores seleccionados por el usuario
+    valores_seleccionados = {}
+
+    # Crear un OptionMenu para cada atributo (sin el último atributo)
+    for i, atributo in enumerate(atributos[:-1]):  # Excluimos el último atributo
+        # Crear una lista de opciones posibles para cada atributo
+        opciones = set(ejemplo[i] for ejemplo in datos)
+        opciones = sorted(list(opciones))  # Ordenamos las opciones
+        # Crear una variable StringVar para cada OptionMenu
+        valores_seleccionados[atributo] = tk.StringVar()
+        valores_seleccionados[atributo].set(opciones[0])  # Establecer valor inicial
+        
+        # Etiqueta para el atributo
+        tk.Label(consulta_frame, text=f"{atributo}:").grid(row=i, column=0, padx=10, pady=5)
+        
+        # Crear el OptionMenu para el atributo
+        menu = tk.OptionMenu(consulta_frame, valores_seleccionados[atributo], *opciones)
+        menu.grid(row=i, column=1, padx=10, pady=5)
+
+    # Función para procesar la consulta y mostrar el resultado
+    def procesar_consulta():
         try:
-            valores = [valor.strip() for valor in entrada.split(",")]
-            if len(valores) != len(atributos[:-1]):
-                raise ValueError(f"Se requieren {len(atributos[:-1])} valores, se recibieron {len(valores)}")
-            ejemplo = {atributos[i]: valores[i] for i in range(len(valores))}
+            ejemplo = {atributos[i]: valores_seleccionados[atributo].get() for i, atributo in enumerate(atributos[:-1])}
             resultado = clasificar(arbol_decision, ejemplo)
             messagebox.showinfo("Resultado", f"Clasificación: {resultado}")
+            ventana_consulta.destroy()  # Cerrar ventana de consulta
         except Exception as e:
             messagebox.showerror("Error", f"Error en la consulta: {e}")
+
+    # Botón para procesar la consulta
+    tk.Button(ventana_consulta, text="Consultar", command=procesar_consulta,
+              bg="#4CAF50", fg="white", font=("Helvetica", 12), padx=10, pady=5).pack(pady=10)
 
 # ----------------------- Interfaz Gráfica Mejorada -----------------------
 
