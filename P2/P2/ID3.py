@@ -4,12 +4,12 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog
 
 # Leer el archivo de atributos
-with open("./P2/AtributosJuego.txt", "r", encoding="utf-8") as f:
+with open("./P2/P2/AtributosJuego.txt", "r", encoding="utf-8") as f:
     atributos = f.readline().strip().split(",")
 
 # Leer el archivo de datos
 datos = []
-with open("./P2/Juego.txt", "r", encoding="utf-8") as f:
+with open("./P2/P2/Juego.txt", "r", encoding="utf-8") as f:
     reader = csv.reader(f)  # Lee el archivo como CSV
     for fila in reader:
         datos.append(fila)
@@ -203,7 +203,7 @@ def consultar_arbol():
         opciones = sorted(list(opciones))  # Ordenamos las opciones
         # Crear una variable StringVar para cada OptionMenu
         valores_seleccionados[atributo] = tk.StringVar()
-        valores_seleccionados[atributo].set(opciones[0])  # Establecer valor inicial
+        valores_seleccionados[atributo].set(opciones[1])
         
         # Etiqueta para el atributo
         tk.Label(consulta_frame, text=f"{atributo}:").grid(row=i, column=0, padx=10, pady=5)
