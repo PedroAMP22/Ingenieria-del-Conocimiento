@@ -124,14 +124,14 @@ def get_bounds(node):
 
 # Función para dibujar el árbol en el canvas
 def draw_node(canvas, node, node_radius):
-    # Nodos internos (con hijos) se dibujan como óvalos
+    
     if node.children:
         canvas.create_oval(node.x - node_radius, node.y - node_radius,
                            node.x + node_radius, node.y + node_radius,
                            fill="lightblue", outline="black")
         canvas.create_text(node.x, node.y, text=node.label, font=("Helvetica", 10, "bold"))
     else:
-        # Para las hojas se dibuja un rectángulo con estilo según su etiqueta
+        
         if node.label.upper() == "NO":
             fill_color = "red"
             display_text = "✖ NO"
@@ -152,7 +152,7 @@ def draw_node(canvas, node, node_radius):
         canvas.create_line(node.x, node.y + node_radius, child.x, child.y - node_radius, arrow=tk.LAST)
         midx = (node.x + child.x) / 2
         midy = (node.y + child.y) / 2
-        # Desplazamiento vertical para separar los textos de las ramas si hay varios hijos
+        
         offset = (i - (num_children - 1) / 2) * 15  
         canvas.create_text(midx, midy + offset, text=str(edge).upper(), fill="blue", font=("Helvetica", 8))
         draw_node(canvas, child, node_radius)
@@ -176,7 +176,7 @@ def dibujar_arbol():
     node_radius = 20
     draw_node(tree_canvas, root_node, node_radius)
 
-# Función para generar el árbol de decisión y dibujarlo, habilitando la consulta
+# Función para generar el árbol de decisión y dibujarlo, con la consulta
 def generar_arbol():
     global arbol_decision
     arbol_decision = ID3(atributos[:-1], datos)
