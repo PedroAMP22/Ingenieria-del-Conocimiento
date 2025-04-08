@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
-from collections import defaultdict
+from collections import defaultdict, Counter
 import random
 import numpy as np
 
@@ -10,6 +10,7 @@ def leerDatosConClase(nombre_archivo):
     """
     Lee el fichero y agrupa los datos por clase.
     Cada línea tiene: f1,f2,f3,f4,clase
+    Retorna un diccionario {clase: [lista_de_muestras]}.
     """
     datos_por_clase = defaultdict(list)
     try:
@@ -27,8 +28,8 @@ def leerDatosConClase(nombre_archivo):
 
 def leerDatosSinClase(nombre_archivo):
     """
-    Lee el fichero y devuelve una lista de características.
-    Se ignora la etiqueta (último valor de cada línea).
+    Lee el fichero y devuelve una lista de muestras.
+    Si la línea incluye etiqueta (más de 4 valores), se ignora la etiqueta.
     """
     datos = []
     try:
@@ -36,9 +37,26 @@ def leerDatosSinClase(nombre_archivo):
             for linea in archivo:
                 valores = linea.strip().split(',')
                 if len(valores) >= 4:
-                    # Se toman las 4 primeras columnas como características
                     caracteristicas = list(map(float, valores[:4]))
                     datos.append(caracteristicas)
+    except FileNotFoundError:
+        messagebox.showerror("Error", f"No se encontró el archivo: {nombre_archivo}")
+    return datos
+
+def leerDatosTest(nombre_archivo):
+    """
+    Lee el fichero de test, devolviendo una lista de tuplas (caracteristicas, etiqueta)
+    Si la línea no tiene etiqueta, etiqueta será None.
+    """
+    datos = []
+    try:
+        with open(nombre_archivo, 'r') as archivo:
+            for linea in archivo:
+                valores = linea.strip().split(',')
+                if len(valores) >= 4:
+                    caracteristicas = list(map(float, valores[:4]))
+                    etiqueta = valores[4] if len(valores) >= 5 else None
+                    datos.append((caracteristicas, etiqueta))
     except FileNotFoundError:
         messagebox.showerror("Error", f"No se encontró el archivo: {nombre_archivo}")
     return datos
@@ -48,8 +66,6 @@ def leerDatosSinClase(nombre_archivo):
 def kMedias(datos, c=2, b=2, tolerancia=0.01, max_iter=100, centros_iniciales=None):
     """
     Implementa el algoritmo K-Medias Fuzzy.
-    Si 'datos' es un diccionario, se unen sus valores; de lo contrario, se asume que es una lista.
-    
     Parámetros:
         datos: conjunto de datos (lista o diccionario)
         c: número de centroides
@@ -74,26 +90,22 @@ def kMedias(datos, c=2, b=2, tolerancia=0.01, max_iter=100, centros_iniciales=No
         if n < c:
             messagebox.showerror("Error", f"Se requieren al menos {c} datos para inicializar los centroides, pero se han encontrado solo {n}.")
             return None, None
-        # Inicializar centroides a partir de los datos, de forma aleatoria
         indices = random.sample(range(n), c)
         centroides = todos_los_datos[indices]
     else:
-        # Usar los centros iniciales proporcionados, aunque n < c
         centroides = np.array(centros_iniciales, dtype=float)
     
     epsilon = 1e-10  # Para evitar división por cero
 
     for _ in range(max_iter):
-        # Calcular la distancia al cuadrado entre cada dato y cada centroide
+        # Calcular distancia al cuadrado entre cada dato y cada centroide
         distancias = np.linalg.norm(todos_los_datos[:, np.newaxis] - centroides, axis=2) ** 2
         distancias = np.maximum(distancias, epsilon)
-        
-        # Cálculo de la matriz de pertenencia (fuzzy)
+        # Calcular matriz de pertenencia
         P = 1 / (distancias ** (1 / (b - 1)))
         P = P / np.sum(P, axis=1, keepdims=True)
         
         centroides_anteriores = np.copy(centroides)
-        # Actualizar cada centroide usando la fórmula ponderada
         for i in range(c):
             pesos = (P[:, i] ** b).reshape(-1, 1)
             numerador = np.sum(pesos * todos_los_datos, axis=0)
@@ -113,25 +125,26 @@ def kMedias(datos, c=2, b=2, tolerancia=0.01, max_iter=100, centros_iniciales=No
 
 def calcular_medias_varianzas(datos):
     """
-    Calcula medias, varianzas y priors a partir de datos agrupados por clase.
+    Calcula medias, varianzas a partir de datos agrupados por clase.
     """
     medias = {}
     varianzas = {}
-    priors = {}
-    total_muestras = sum(len(muestras) for muestras in datos.values())
     
     for clase, muestras in datos.items():
         muestras_array = np.array(muestras)
         medias[clase] = np.mean(muestras_array, axis=0)
-        varianzas[clase] = np.var(muestras_array, axis=0) + 1e-6  # Evitar división por cero
-        priors[clase] = len(muestras) / total_muestras
+        varianzas[clase] = np.var(muestras_array, axis=0) + 1e-6  # Para evitar división por cero
     
-    return medias, varianzas, priors
+    return medias, varianzas
 
 def clasificarBayes(muestra, medias, varianzas, priors):
+    """
+    Dada una muestra, calcula la probabilidad logarítmica de pertenecer a cada clase 
+    y retorna la clase con mayor probabilidad.
+    """
     def probabilidad_gaussiana(x, media, varianza):
         return (1 / np.sqrt(2 * np.pi * varianza)) * np.exp(-((x - media) ** 2) / (2 * varianza))
-
+    
     probabilidades = {}
     for clase in medias:
         prob = np.log(priors[clase])
@@ -147,9 +160,9 @@ def lloyd(data, centers, learning_rate=0.1, tol=1e-10, max_iter=10):
     Algoritmo de Lloyd Competitivo.
     Parámetros:
       - centers: centros iniciales (lista o array)
-      - learning_rate: tasa de aprendizaje (0.1)
-      - tol: tolerancia (1e-10)
-      - max_iter: número máximo de iteraciones (10)
+      - learning_rate: tasa de aprendizaje
+      - tol: tolerancia
+      - max_iter: número máximo de iteraciones
     """
     centers = np.array(centers, dtype=float)
     data = np.array(data, dtype=float)
@@ -157,68 +170,133 @@ def lloyd(data, centers, learning_rate=0.1, tol=1e-10, max_iter=10):
     for _ in range(max_iter):
         prev_centers = centers.copy()
         for x in data:
-            # Encuentra el centroide más cercano
             j = np.argmin(np.linalg.norm(x - centers, axis=1))
-            # Actualización suave del centroide ganador
             centers[j] += learning_rate * (x - centers[j])
         if np.linalg.norm(centers - prev_centers) < tol:
             break
     return centers
 
-# --- Función para ejecutar el algoritmo seleccionado ---
+# --- Funciones para clasificación basada en clustering ---
+
+def clasificarPorCluster(muestra, centros):
+    """
+    Dada una muestra y un conjunto de centros, retorna el índice del centro 
+    (cluster) más cercano.
+    """
+    distancias = np.linalg.norm(np.array(centros) - np.array(muestra), axis=1)
+    return np.argmin(distancias)
+
+# --- Función para ejecutar el algoritmo seleccionado sobre datos de entrenamiento y test ---
 
 def ejecutar_algoritmo():
     salida.delete(1.0, tk.END)  # Limpiar área de resultados
     alg = algoritmo_var.get()
-    nombre_archivo = archivo_entry.get().strip()
+    # Archivos de entrada
+    entrenamiento_file = entrenamiento_entry.get().strip()
+    test_file = test_entry.get().strip()
     
-    if not nombre_archivo:
-        messagebox.showerror("Error", "Debe especificar la ruta del archivo.")
-        return
-    
-    # Para clustering (K-Medias Fuzzy y Lloyd) solo se leen las características;
-    # para Bayes se requiere la información de las clases.
-    if alg == "Bayes":
-        datos = leerDatosConClase(nombre_archivo)
-    else:
-        datos = leerDatosSinClase(nombre_archivo)
-    
-    if not datos:
-        salida.insert(tk.END, "No se pudieron cargar datos.\n")
+    if not entrenamiento_file or not test_file:
+        messagebox.showerror("Error", "Se deben especificar ambos archivos: entrenamiento y test.")
         return
 
+    # Leer datos de test (se espera formato: f1,f2,f3,f4,etiqueta)
+    datos_test = leerDatosTest(test_file)
+    if not datos_test:
+        salida.insert(tk.END, "No se pudieron cargar datos de test.\n")
+        return
+
+    salida.insert(tk.END, f"Ejecutando {alg}...\n\n")
+    
     if alg == "K-Medias Fuzzy":
-        # Usar los centros iniciales sugeridos en el enunciado
+        # Para clustering, leemos los datos de entrenamiento con etiquetas
+        datos_entrenamiento_conclase = leerDatosConClase(entrenamiento_file)
+        if not datos_entrenamiento_conclase:
+            salida.insert(tk.END, "No se pudieron cargar datos de entrenamiento.\n")
+            return
+        # Extraer características y etiquetas
+        features_training = []
+        labels_training = []
+        for clase, muestras in datos_entrenamiento_conclase.items():
+            for muestra in muestras:
+                features_training.append(muestra)
+                labels_training.append(clase)
+        
+        # Ejecutar K-Medias Fuzzy sobre las características
         centros_iniciales = [
             [4.6, 3.0, 4.0, 0.0],
             [6.8, 3.4, 4.6, 0.7]
         ]
-        centroides, P = kMedias(datos, c=2, b=2, tolerancia=0.01, max_iter=100, centros_iniciales=centros_iniciales)
-        if centroides is not None:
-            salida.insert(tk.END, "K-Medias Fuzzy:\n")
-            salida.insert(tk.END, f"Centroides finales:\n{centroides}\n")
-        else:
+        centroides, P = kMedias(features_training, c=2, b=2, tolerancia=0.01, max_iter=100, centros_iniciales=centros_iniciales)
+        if centroides is None:
             salida.insert(tk.END, "Error en K-Medias Fuzzy.\n")
+            return
+        
+        # Asignar etiqueta a cada cluster mediante mayoría en el conjunto de entrenamiento
+        asignaciones = [clasificarPorCluster(x, centroides) for x in features_training]
+        cluster_labels = {}
+        for cluster in range(len(centroides)):
+            etiquetas_cluster = [labels_training[i] for i, clus in enumerate(asignaciones) if clus == cluster]
+            if etiquetas_cluster:
+                cluster_labels[cluster] = Counter(etiquetas_cluster).most_common(1)[0][0]
+            else:
+                cluster_labels[cluster] = "Desconocido"
+                
+        salida.insert(tk.END, "K-Medias Fuzzy:\n")
+        salida.insert(tk.END, f"Centroides finales:\n{centroides}\n\n")
+        for i, (carac, real) in enumerate(datos_test):
+            cluster = clasificarPorCluster(carac, centroides)
+            pred_label = cluster_labels.get(cluster, "Desconocido")
+            salida.insert(tk.END, f"Test {i+1}: Predicción = {pred_label} | Valor real = {real}\n")
+    
     elif alg == "Bayes":
-        # Calcular parámetros Bayes y clasificar una muestra de prueba
-        medias, varianzas, priors = calcular_medias_varianzas(datos)
-        # Ejemplo de muestra de prueba (ajustar según corresponda)
-        muestra_prueba = [5.1, 3.5, 1.4, 0.2]
-        clase_predicha = clasificarBayes(muestra_prueba, medias, varianzas, priors)
+        datos_entrenamiento = leerDatosConClase(entrenamiento_file)
+        if not datos_entrenamiento:
+            salida.insert(tk.END, "No se pudieron cargar datos de entrenamiento.\n")
+            return
+        medias, varianzas = calcular_medias_varianzas(datos_entrenamiento)
+        total = sum(len(muestras) for muestras in datos_entrenamiento.values())
+        priors = {clase: len(muestras) / total for clase, muestras in datos_entrenamiento.items()}
         salida.insert(tk.END, "Bayes:\n")
-        salida.insert(tk.END, f"Muestra de prueba: {muestra_prueba}\n")
-        salida.insert(tk.END, f"Clase predicha: {clase_predicha}\n")
+        salida.insert(tk.END, f"Medias: Setosa={medias.get('Iris-setosa')}, Versicolor={medias.get('Iris-versicolor')}\n\n")
+        for i, (carac, real) in enumerate(datos_test):
+            pred = clasificarBayes(carac, medias, varianzas, priors)
+            salida.insert(tk.END, f"Test {i+1}: Predicción = {pred} | Valor real = {real}\n")
+    
     elif alg == "Lloyd Competitivo":
-        # Para Lloyd se utilizan únicamente las características
-        todos_los_datos = leerDatosSinClase(nombre_archivo)
-        # Centros iniciales sugeridos según el enunciado
+        # Para Lloyd, se lee también el conjunto con etiquetas para asignar nombre al cluster
+        datos_entrenamiento_conclase = leerDatosConClase(entrenamiento_file)
+        if not datos_entrenamiento_conclase:
+            salida.insert(tk.END, "No se pudieron cargar datos de entrenamiento.\n")
+            return
+        features_training = []
+        labels_training = []
+        for clase, muestras in datos_entrenamiento_conclase.items():
+            for muestra in muestras:
+                features_training.append(muestra)
+                labels_training.append(clase)
+        
         centros_iniciales = [
             [4.6, 3.0, 4.0, 0.0],
             [6.8, 3.4, 4.6, 0.7]
         ]
-        centros_finales = lloyd(todos_los_datos, centros_iniciales, learning_rate=0.1, tol=1e-10, max_iter=10)
+        centros_finales = lloyd(features_training, centros_iniciales, learning_rate=0.1, tol=1e-10, max_iter=10)
+        
+        # Asignar etiqueta a cada cluster según los datos de entrenamiento
+        asignaciones = [clasificarPorCluster(x, centros_finales) for x in features_training]
+        cluster_labels = {}
+        for cluster in range(len(centros_finales)):
+            etiquetas_cluster = [labels_training[i] for i, clus in enumerate(asignaciones) if clus == cluster]
+            if etiquetas_cluster:
+                cluster_labels[cluster] = Counter(etiquetas_cluster).most_common(1)[0][0]
+            else:
+                cluster_labels[cluster] = "Desconocido"
+                
         salida.insert(tk.END, "Lloyd Competitivo:\n")
-        salida.insert(tk.END, f"Centros finales:\n{centros_finales}\n")
+        salida.insert(tk.END, f"Centros finales:\n{centros_finales}\n\n")
+        for i, (carac, real) in enumerate(datos_test):
+            cluster = clasificarPorCluster(carac, centros_finales)
+            pred_label = cluster_labels.get(cluster, "Desconocido")
+            salida.insert(tk.END, f"Test {i+1}: Predicción = {pred_label} | Valor real = {real}\n")
     else:
         salida.insert(tk.END, "Seleccione un algoritmo.\n")
 
@@ -226,19 +304,27 @@ def ejecutar_algoritmo():
 
 ventana = tk.Tk()
 ventana.title("Comparativa de Algoritmos de Clasificación y Clustering")
-ventana.geometry("750x500")
+ventana.geometry("800x600")
 
-# Selección de archivo
-frame_archivo = ttk.Frame(ventana)
-frame_archivo.pack(padx=10, pady=10, fill=tk.X)
-ttk.Label(frame_archivo, text="Ruta del archivo:").pack(side=tk.LEFT)
-archivo_entry = ttk.Entry(frame_archivo, width=50)
-archivo_entry.insert(0, "TestIris01.txt")  # Archivo por defecto
-archivo_entry.pack(side=tk.LEFT, padx=5)
+# Selección de archivo de entrenamiento
+frame_entrenamiento = ttk.Frame(ventana)
+frame_entrenamiento.pack(padx=10, pady=5, fill=tk.X)
+ttk.Label(frame_entrenamiento, text="Archivo de Entrenamiento:").pack(side=tk.LEFT)
+entrenamiento_entry = ttk.Entry(frame_entrenamiento, width=50)
+entrenamiento_entry.insert(0, "Iris2Clases.txt")  # Por defecto
+entrenamiento_entry.pack(side=tk.LEFT, padx=5)
+
+# Selección de archivo de test
+frame_test = ttk.Frame(ventana)
+frame_test.pack(padx=10, pady=5, fill=tk.X)
+ttk.Label(frame_test, text="Archivo de Test:").pack(side=tk.LEFT)
+test_entry = ttk.Entry(frame_test, width=50)
+test_entry.insert(0, "TestIris01.txt")
+test_entry.pack(side=tk.LEFT, padx=5)
 
 # Selección de algoritmo
 frame_alg = ttk.Frame(ventana)
-frame_alg.pack(padx=10, pady=10, fill=tk.X)
+frame_alg.pack(padx=10, pady=5, fill=tk.X)
 ttk.Label(frame_alg, text="Selecciona el algoritmo:").pack(side=tk.LEFT)
 algoritmo_var = tk.StringVar()
 algoritmos = ["K-Medias Fuzzy", "Bayes", "Lloyd Competitivo"]
